@@ -1,39 +1,103 @@
 <% layout('layout') -%>
 <h2>Schedule a Free Pickup</h2>
-<form action="/tickets" method="post" enctype="multipart/form-data" class="row g-3">
-  <div class="col-md-6"><label class="form-label">Your Name</label><input name="donor_name" required class="form-control"></div>
-  <div class="col-md-3"><label class="form-label">Email</label><input type="email" name="donor_email" required class="form-control"></div>
-  <div class="col-md-3"><label class="form-label">Phone</label><input name="donor_phone" required class="form-control"></div>
 
-  <div class="col-md-8"><label class="form-label">Pickup Address</label><input name="pickup_address" required class="form-control"></div>
-  <div class="col-md-2"><label class="form-label">City</label><input name="city" class="form-control"></div>
-  <div class="col-md-1"><label class="form-label">State</label><input name="state" class="form-control"></div>
-  <div class="col-md-1"><label class="form-label">ZIP</label><input name="zip" class="form-control"></div>
+<form id="donorForm" action="/tickets" method="post" enctype="multipart/form-data" class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label">Your Name</label>
+    <input name="donor_name" required class="form-control" autocomplete="name">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Email</label>
+    <input type="email" name="donor_email" required class="form-control" autocomplete="email">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Phone</label>
+    <input name="donor_phone" required class="form-control" autocomplete="tel">
+  </div>
+
+  <div class="col-md-8">
+    <label class="form-label">Pickup Address</label>
+    <input name="pickup_address" required class="form-control" autocomplete="street-address">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">City</label>
+    <input name="city" required class="form-control" autocomplete="address-level2">
+  </div>
+  <div class="col-md-1">
+    <label class="form-label">State</label>
+    <input name="state" required maxlength="2" class="form-control text-uppercase" autocomplete="address-level1">
+  </div>
+  <div class="col-md-1">
+    <label class="form-label">ZIP</label>
+    <input name="zip" required pattern="\d{5}" class="form-control" autocomplete="postal-code">
+  </div>
 
   <div class="col-12">
-    <label class="form-label">Items (select all that apply)</label>
-    <div class="row">
-      <div class="col-md-2"><input class="form-check-input" type="checkbox" name="categories" value="clothing"> Clothing</div>
-      <div class="col-md-2"><input class="form-check-input" type="checkbox" name="categories" value="furniture"> Furniture</div>
-      <div class="col-md-2"><input class="form-check-input" type="checkbox" name="categories" value="toys"> Toys</div>
-      <div class="col-md-2"><input class="form-check-input" type="checkbox" name="categories" value="household"> Household</div>
-      <div class="col-md-2"><input class="form-check-input" type="checkbox" name="categories" value="electronics"> Electronics</div>
+    <label class="form-label mb-1">Items (select at least one)</label>
+    <div class="row gy-2">
+      <div class="col-md-2"><label><input class="form-check-input me-1 item-check" type="checkbox" name="categories" value="clothing"> Clothing</label></div>
+      <div class="col-md-2"><label><input class="form-check-input me-1 item-check" type="checkbox" name="categories" value="furniture"> Furniture</label></div>
+      <div class="col-md-2"><label><input class="form-check-input me-1 item-check" type="checkbox" name="categories" value="toys"> Toys</label></div>
+      <div class="col-md-2"><label><input class="form-check-input me-1 item-check" type="checkbox" name="categories" value="household"> Household</label></div>
+      <div class="col-md-2"><label><input class="form-check-input me-1 item-check" type="checkbox" name="categories" value="electronics"> Electronics</label></div>
     </div>
+    <div id="itemsError" class="text-danger small mt-1" style="display:none;">Please select at least one item type.</div>
   </div>
 
-  <div class="col-md-4"><label class="form-label">Overall Condition</label>
-    <select name="condition" class="form-select"><option>Excellent</option><option>Good</option><option>Bad</option><option>Worse</option></select>
-  </div>
-  <div class="col-md-8"><label class="form-label">Notes</label><textarea name="item_notes" rows="3" class="form-control"></textarea></div>
-
-  <div class="col-md-4"><label class="form-label">Preferred Date</label><input type="date" name="preferred_date" class="form-control"></div>
-  <div class="col-md-4"><label class="form-label">Preferred Time (≥ 9:30 AM)</label><input type="time" name="preferred_time" class="form-control" min="09:30" max="17:00"></div>
-
-  <div class="col-md-3"><label class="form-label">Bags of clothing</label><input type="number" name="bags_count" value="0" min="0" step="1" class="form-control"></div>
-  <div class="col-md-3"><label class="form-label">Pieces of furniture</label><input type="number" name="furniture_count" value="0" min="0" step="1" class="form-control"></div>
-  <div class="col-md-3 d-flex align-items-end">
-    <div class="form-check"><input class="form-check-input" type="checkbox" name="small_donation" id="smallDonation"><label for="smallDonation" class="form-check-label">Small donation</label></div>
+  <div class="col-md-4">
+    <label class="form-label">Overall Condition</label>
+    <select name="condition" class="form-select" required>
+      <option value="" selected disabled>Select…</option>
+      <option>Excellent</option><option>Good</option><option>Bad</option><option>Worse</option>
+    </select>
   </div>
 
-  <div class="col-12"><button class="btn btn-primary mt-2">Submit Pickup Request</button></div>
+  <div class="col-md-8">
+    <label class="form-label">Short description (gate codes, notes, etc.)</label>
+    <textarea name="item_notes" rows="3" class="form-control" required></textarea>
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label">Preferred Date</label>
+    <input type="date" name="preferred_date" class="form-control" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Preferred Time (≥ 9:30 AM)</label>
+    <input type="time" name="preferred_time" class="form-control" min="09:30" max="17:00" required>
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">Bags of clothing</label>
+    <input type="number" name="bags_count" value="0" min="0" step="1" class="form-control" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Pieces of furniture</label>
+    <input type="number" name="furniture_count" value="0" min="0" step="1" class="form-control" required>
+  </div>
+
+  <div class="col-md-12">
+    <label class="form-label">Photos (optional — up to 10)</label>
+    <input type="file" name="item_images" class="form-control" accept="image/*" multiple>
+    <div class="form-text">Add photos of the items to help our team plan the pickup.</div>
+  </div>
+
+  <div class="col-12">
+    <button class="btn btn-primary mt-2">Submit Pickup Request</button>
+  </div>
 </form>
+
+<script>
+// Enforce at least one item and uppercase state
+document.getElementById('donorForm').addEventListener('submit', function(e){
+  const anyChecked = [...document.querySelectorAll('.item-check')].some(c=>c.checked);
+  if(!anyChecked){
+    document.getElementById('itemsError').style.display='block';
+    e.preventDefault();
+  }
+  const st = this.querySelector('input[name="state"]');
+  if (st) st.value = (st.value||'').toUpperCase().slice(0,2);
+});
+document.querySelectorAll('.item-check').forEach(c=>c.addEventListener('change',()=> {
+  document.getElementById('itemsError').style.display='none';
+}));
+</script>
