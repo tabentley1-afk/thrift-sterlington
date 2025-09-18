@@ -1,0 +1,81 @@
+<% layout('layout') -%>
+<h3>Ticket #<%= t.id %></h3>
+<div class="row">
+  <div class="col-md-8">
+    <div class="card mb-3">
+      <div class="card-header">Donor & Pickup</div>
+      <div class="card-body">
+        <p><strong><%= t.donor_name %></strong> — <%= t.donor_email %> — <%= t.donor_phone %></p>
+        <p><%= t.pickup_address %>, <%= t.city %>, <%= t.state %> <%= t.zip %></p>
+        <p><strong>Items:</strong> <%= JSON.parse(t.categories||'[]').join(', ') %></p>
+        <p><strong>Condition:</strong> <%= t.condition %></p>
+        <p><strong>Notes:</strong> <%= t.item_notes %></p>
+        <p><strong>Bags:</strong> <%= t.bags_count||0 %> • <strong>Furniture:</strong> <%= t.furniture_count||0 %> • <strong>Small:</strong> <%= (t.small_donation? 'Yes':'No') %></p>
+        <p><strong>Preferred:</strong> <%= t.preferred_date||'' %> <%= t.preferred_time? (t.preferred_time.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+h;const ampm=h>=12?'PM':'AM';h=h%12||12;return h+':'+mm+' '+ampm;})) : '' %> (CT)</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card mb-3">
+      <div class="card-header">Costs (internal)</div>
+      <div class="card-body">
+        <p>Miles (RT): <strong><%= t.estimated_miles || 0 %> mi</strong></p>
+        <form method="post" action="/admin/tickets/<%= t.id %>/timecost" class="mb-2">
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label">Drive minutes</label>
+              <input name="drive_minutes" type="number" class="form-control" value="<%= t.drive_minutes||0 %>">
+            </div>
+            <div class="col-6">
+              <label class="form-label">On-site minutes</label>
+              <input name="onsite_minutes" type="number" class="form-control" value="<%= t.onsite_minutes||0 %>">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Crew size</label>
+              <input name="crew_size" type="number" min="1" max="3" class="form-control" value="<%= t.crew_size||1 %>">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Fuel $/mile</label>
+              <input name="fuel_cost_per_mile" type="number" step="0.01" class="form-control" value="<%= t.fuel_cost_per_mile||0.2 %>">
+            </div>
+          </div>
+          <button class="btn btn-outline-secondary w-100 mt-2">Update time & cost</button>
+        </form>
+        <form method="post" action="/admin/tickets/<%= t.id %>/recalc">
+          <button class="btn btn-primary w-100">Recalculate Mileage & Crew</button>
+        </form>
+        <hr/>
+        <p class="mb-0 small">Estimated total: <strong>$<%= (t.estimated_cost||0).toFixed(2) %></strong></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Status</div>
+      <div class="card-body">
+        <form method="post" action="/admin/tickets/<%= t.id %>/status">
+          <select name="status" class="form-select mb-2">
+            <option value="new" <%= t.status==='new'?'selected':'' %>>New</option>
+            <option value="scheduled" <%= t.status==='scheduled'?'selected':'' %>>Scheduled</option>
+            <option value="completed" <%= t.status==='completed'?'selected':'' %>>Completed</option>
+            <option value="canceled" <%= t.status==='canceled'?'selected':'' %>>Canceled</option>
+          </select>
+          <button class="btn btn-outline-secondary w-100">Update Status</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header">Schedule (9:30 AM – 5:00 PM CT)</div>
+      <div class="card-body">
+        <form method="post" action="/admin/tickets/<%= t.id %>/schedule">
+          <label class="form-label">Start (CT)</label>
+          <input type="datetime-local" name="start_iso" class="form-control mb-2" required>
+          <label class="form-label">Duration (hours)</label>
+          <input type="number" step="0.25" name="duration_hours" class="form-control mb-2" value="1">
+          <button class="btn btn-primary w-100">Schedule</button>
+        </form>
+        <small class="text-muted">Blackout days are blocked; business hours enforced.</small>
+      </div>
+    </div>
+  </div>
+</div>

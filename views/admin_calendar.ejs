@@ -1,0 +1,48 @@
+<% layout('layout') -%>
+<h3>Admin Calendar (CT)</h3>
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css' rel='stylesheet' />
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+
+<div id='calendar'></div>
+
+<style>
+#calendar { background:#fff; padding:12px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.06); min-height: 600px; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    editable: true,
+    eventResizableFromStart: true,
+    eventSources: [
+      '/api/schedule',
+      { url: '/api/blackouts', display: 'background' }
+    ],
+    eventDrop: updateEvent,
+    eventResize: updateEvent,
+    eventAllow: function(dropInfo, dragged){
+      // prevent drops on blackout days visually (server also validates)
+      const dateStr = dropInfo.start.toISOString().slice(0,10);
+      const cell = document.querySelector('.fc-daygrid-day[data-date="'+dateStr+'"]');
+      if (cell && cell.querySelector('.fc-bg-event')) return false;
+      return true;
+    }
+  });
+  calendar.render();
+
+  async function updateEvent(info){
+    const ev = info.event;
+    const body = new URLSearchParams();
+    body.set('start_iso', ev.start.toISOString());
+    body.set('end_iso', ev.end.toISOString());
+    const res = await fetch('/admin/schedule/' + ev.id + '/move', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
+    if(!res.ok){
+      const data = await res.json().catch(()=>({error:'Conflict or out of business hours / blackout day.'}));
+      alert(data.error || 'Conflict or out of business hours / blackout day. Change reverted.');
+      info.revert();
+    }
+  }
+});
+</script>

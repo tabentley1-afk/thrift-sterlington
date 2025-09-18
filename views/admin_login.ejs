@@ -1,0 +1,12 @@
+<% layout('layout') -%>
+<h3>Admin Login</h3>
+<form method="post" action="/admin" class="row g-3 col-md-6">
+  <div class="col-12">
+    <label class="form-label">Admin Secret</label>
+    <input name="secret" type="password" class="form-control" placeholder="password">
+  </div>
+  <% if (err) { %><div class="text-danger"><%= err %></div><% } %>
+  <div class="col-12">
+    <button class="btn btn-dark">Enter</button>
+  </div>
+</form>

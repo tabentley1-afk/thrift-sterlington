@@ -1,0 +1,16 @@
+<% layout('layout') -%>
+<h3>Van Schedule (Admin)</h3>
+<table class="table table-bordered">
+  <thead><tr><th>Start (CT)</th><th>End (CT)</th><th>Donor</th><th>Address</th></tr></thead>
+  <tbody>
+  <% events.forEach(e => { %>
+    <tr>
+      <td><%= new Date(e.start_iso).toLocaleString('en-US', { timeZone: CT_ZONE, hour:'numeric', minute:'2-digit', month:'short', day:'numeric' }) %></td>
+      <td><%= new Date(e.end_iso).toLocaleString('en-US', { timeZone: CT_ZONE, hour:'numeric', minute:'2-digit', month:'short', day:'numeric' }) %></td>
+      <td>#<%= e.ticket_id %> — <%= e.donor_name %></td>
+      <td><%= e.pickup_address %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+<p class="text-muted">One van = one pickup at a time. Hours enforced 9:30 AM – 5:00 PM (CT). Blackout days disabled.</p>

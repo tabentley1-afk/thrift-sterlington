@@ -1,0 +1,27 @@
+<% layout('layout') -%>
+<h3>Blackout Days (Closed)</h3>
+<form method="post" action="/admin/blackouts" class="row g-3 mb-3">
+  <div class="col-auto">
+    <label class="form-label">Add blackout date</label>
+    <input type="date" name="date" class="form-control" required>
+  </div>
+  <div class="col-auto align-self-end">
+    <button class="btn btn-warning">Add</button>
+  </div>
+</form>
+<table class="table table-bordered">
+  <thead><tr><th>Date</th><th></th></tr></thead>
+  <tbody>
+  <% days.forEach(d => { %>
+    <tr>
+      <td><%= d.date %></td>
+      <td>
+        <form method="post" action="/admin/blackouts/<%= d.id %>/delete" onsubmit="return confirm('Remove this blackout?');">
+          <button class="btn btn-sm btn-outline-danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+<p class="text-muted">Blackout days appear in the calendar and are blocked for scheduling.</p>

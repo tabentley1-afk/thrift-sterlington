@@ -1,0 +1,29 @@
+<% layout('layout') -%>
+<h3>Tickets</h3>
+<div class='mb-2'>
+  <a class='btn btn-sm btn-outline-secondary' href='/admin/availability'>Availability List</a>
+  <a class='btn btn-sm btn-outline-secondary' href='/admin/calendar'>Calendar</a>
+  <a class='btn btn-sm btn-outline-secondary' href='/admin/export.csv'>Export CSV</a>
+  <a class='btn btn-sm btn-outline-warning' href='/admin/blackouts'>Blackout Days</a>
+  <a class='btn btn-sm btn-outline-danger' href='/admin/logout'>Log out</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>#</th><th>Created (CT)</th><th>Donor</th><th>Address</th><th>Status</th><th>Preferred</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  <% tickets.forEach(t => { %>
+    <tr>
+      <td><%= t.id %></td>
+      <td><%= new Date(t.created_at).toLocaleString('en-US', { timeZone: CT_ZONE, hour:'numeric', minute:'2-digit', month:'short', day:'numeric' }) %></td>
+      <td><%= t.donor_name %> (<%= t.donor_phone %>)</td>
+      <td><%= t.pickup_address %>, <%= t.city %></td>
+      <td><span class="badge bg-<%= t.status==='new'?'secondary':(t.status==='scheduled'?'info':(t.status==='completed'?'success':'warning')) %>"><%= t.status %></span></td>
+      <td><%= t.preferred_date||'' %> <%= t.preferred_time? (t.preferred_time.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+h;const ampm=h>=12?'PM':'AM';h=h%12||12;return h+':'+mm+' '+ampm;})) : '' %></td>
+      <td><a class="btn btn-sm btn-outline-primary" href="/admin/tickets/<%= t.id %>">Open</a></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
