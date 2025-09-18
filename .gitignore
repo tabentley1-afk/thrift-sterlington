@@ -1,0 +1,5 @@
+﻿node_modules
+uploads
+data.sqlite
+outbox
+npm-debug.log*
