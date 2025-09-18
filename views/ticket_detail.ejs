@@ -1,30 +1,74 @@
 <% layout('layout') -%>
 <h3>Ticket #<%= t.id %></h3>
+
+<%
+// --- Safe helpers for this template only ---
+let imgs = [];
+try {
+  if (Array.isArray(t.images_json)) { imgs = t.images_json; }
+  else if (typeof t.images_json === 'string' && t.images_json.trim()) {
+    try { imgs = JSON.parse(t.images_json); }
+    catch { imgs = t.images_json.split(',').map(s=>s.trim()).filter(Boolean); }
+  }
+} catch(e) { imgs = []; }
+const cats = (t.categoriesArray && Array.isArray(t.categoriesArray)) ? t.categoriesArray : [];
+%>
+
 <div class="row">
   <div class="col-md-8">
-    <div class="card mb-3"><div class="card-header">Donor & Pickup</div><div class="card-body">
-      <p><strong><%= t.donor_name %></strong> — <%= t.donor_email %> — <%= t.donor_phone %></p>
-      <p><%= t.pickup_address %>, <%= t.city %>, <%= t.state %> <%= t.zip %></p>
-      <p><strong>Items:</strong> <%= (t.categoriesArray || []).join(', ') %></p>
-      <p><strong>Condition:</strong> <%= t.condition %></p>
-      <p><strong>Notes:</strong> <%= t.item_notes %></p>
-      <p><strong>Bags:</strong> <%= t.bags_count||0 %> • <strong>Furniture:</strong> <%= t.furniture_count||0 %> • <strong>Small:</strong> <%= (t.small_donation? 'Yes':'No') %></p>
-      <p><strong>Preferred:</strong> <%= t.preferred_date||'' %> <%= t.preferred_time? (t.preferred_time.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+h;const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+mm+' '+ap;})) : '' %> (CT)</p>
-    </div></div>
+    <div class="card mb-3">
+      <div class="card-header">Donor & Pickup</div>
+      <div class="card-body">
+        <p><strong><%= t.donor_name %></strong> — <%= t.donor_email %> — <%= t.donor_phone %></p>
+        <p><%= t.pickup_address %>, <%= t.city %>, <%= t.state %> <%= t.zip %></p>
+        <p><strong>Items:</strong> <%= cats.join(', ') %></p>
+        <p><strong>Condition:</strong> <%= t.condition %></p>
+        <p><strong>Notes:</strong> <%= t.item_notes %></p>
+        <p><strong>Bags:</strong> <%= t.bags_count||0 %> • <strong>Furniture:</strong> <%= t.furniture_count||0 %> • <strong>Small:</strong> <%= (t.small_donation? 'Yes':'No') %></p>
+        <p><strong>Preferred:</strong> <%= t.preferred_date||'' %>
+          <%= t.preferred_time? (t.preferred_time.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+h;const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+mm+' '+ap;})) : '' %> (CT)
+        </p>
+
+        <% if (imgs.length) { %>
+          <hr/>
+          <h6 class="mb-2">Photos</h6>
+          <div class="d-flex flex-wrap gap-2">
+            <% imgs.forEach(fn => { %>
+              <a href="/uploads/<%= fn %>" target="_blank" class="thumb-link">
+                <img src="/uploads/<%= fn %>" alt="item photo" class="thumb-img">
+              </a>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <div class="text-muted">No photos uploaded.</div>
+        <% } %>
+      </div>
+    </div>
   </div>
+
   <div class="col-md-4">
     <div class="card mb-3"><div class="card-header">Costs (internal)</div><div class="card-body">
       <p>Miles (RT): <strong><%= t.estimated_miles || 0 %> mi</strong></p>
       <p>Drive minutes (auto): <strong><%= t.drive_minutes || 0 %> min</strong></p>
+
       <form method="post" action="/admin/tickets/<%= t.id %>/timecost" class="mb-2">
         <div class="row g-2">
-          <div class="col-6"><label class="form-label">Crew size</label><input name="crew_size" type="number" min="1" max="3" class="form-control" value="<%= t.crew_size||1 %>"></div>
-          <div class="col-6"><label class="form-label">Fuel $/mile</label><input name="fuel_cost_per_mile" type="number" step="0.01" class="form-control" value="<%= t.fuel_cost_per_mile||0.2 %>"></div>
+          <div class="col-6">
+            <label class="form-label">Crew size</label>
+            <input name="crew_size" type="number" min="1" max="3" class="form-control" value="<%= t.crew_size||1 %>">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Fuel $/mile</label>
+            <input name="fuel_cost_per_mile" type="number" step="0.01" class="form-control" value="<%= t.fuel_cost_per_mile||0.2 %>">
+          </div>
         </div>
         <button class="btn btn-outline-secondary w-100 mt-2">Update cost</button>
       </form>
+
       <hr/>
-      <p class="mb-0 small">Estimated total: <strong>$<%= t.estimatedCostNumber.toFixed(2) %></strong></p>
+      <p class="mb-0 small">Estimated total:
+        <strong>$<%= (Number(t.estimated_cost||0)).toFixed(2) %></strong>
+      </p>
     </div></div>
 
     <div class="card"><div class="card-header">Status</div><div class="card-body">
@@ -51,3 +95,8 @@
     </div></div>
   </div>
 </div>
+
+<style>
+.thumb-img{ width:110px; height:110px; object-fit:cover; border-radius:8px; border:1px solid #ddd; }
+.thumb-link{ display:inline-block; }
+</style>
