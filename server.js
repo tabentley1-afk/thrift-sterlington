@@ -1,3 +1,6 @@
+// server.js (drop-in)
+// Change log:
+// - Normalize categories so a single checkbox (string) becomes ["value"].
 
 require('dotenv').config();
 process.env.TZ = process.env.TZ || 'America/Chicago';
@@ -76,13 +79,21 @@ function validateBusinessHoursCT(start, end){
 // routes
 app.get('/', (req,res)=>res.redirect('/donate'));
 app.get('/donate', (req,res)=>res.render('donor_form'));
+
+// 🔧 FIXED: normalize categories to an array so single checkbox doesn't break
 app.post('/tickets', upload.array('item_images',10), (req,res)=>{
   const b = req.body;
   const files = (req.files||[]).map(f=>f.filename);
+
+  // Normalize categories: can be undefined, string, or array
+  let cats = b.categories;
+  if (!Array.isArray(cats)) cats = cats ? [cats] : [];
+
   const ticket = {
     donor_name: b.donor_name, donor_email: b.donor_email, donor_phone: b.donor_phone,
     pickup_address: b.pickup_address, city: b.city, state: b.state, zip: b.zip,
-    categories: JSON.stringify(b.categories || []), condition: b.condition, item_notes: b.item_notes,
+    categories: JSON.stringify(cats),           // <-- store as JSON array
+    condition: b.condition, item_notes: b.item_notes,
     preferred_date: b.preferred_date || null, preferred_time: b.preferred_time || null,
     bags_count: parseInt(b.bags_count||0)||0,
     furniture_count: parseInt(b.furniture_count||0)||0,
