@@ -1,8 +1,11 @@
 
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const dbFile = path.join(__dirname, 'data.sqlite');
+const dataDir = process.env.DATA_DIR || __dirname;
+fs.mkdirSync(dataDir, { recursive: true });
+const dbFile = path.join(dataDir, 'data.sqlite');
 const db = new Database(dbFile);
 
 function init() {
@@ -13,9 +16,7 @@ function init() {
       donor_email TEXT,
       donor_phone TEXT,
       pickup_address TEXT,
-      city TEXT,
-      state TEXT,
-      zip TEXT,
+      city TEXT, state TEXT, zip TEXT,
       categories TEXT,
       condition TEXT,
       item_notes TEXT,
@@ -47,49 +48,42 @@ function init() {
   `);
 }
 
-function insertTicket(t) {
-  const stmt = db.prepare(`INSERT INTO tickets 
-    (donor_name, donor_email, donor_phone, pickup_address, city, state, zip, categories, condition, item_notes, preferred_date, preferred_time, bags_count, furniture_count, small_donation, crew_size, estimated_miles, drive_minutes, onsite_minutes, fuel_cost_per_mile, estimated_cost, images_json, status, created_at)
-    VALUES (@donor_name, @donor_email, @donor_phone, @pickup_address, @city, @state, @zip, @categories, @condition, @item_notes, @preferred_date, @preferred_time, @bags_count, @furniture_count, @small_donation, @crew_size, @estimated_miles, @drive_minutes, @onsite_minutes, @fuel_cost_per_mile, @estimated_cost, @images_json, @status, @created_at)`);
-  return stmt.run(t).lastInsertRowid;
-}
+function insertTicket(t){ return db.prepare(`INSERT INTO tickets
+(donor_name,donor_email,donor_phone,pickup_address,city,state,zip,categories,condition,item_notes,preferred_date,preferred_time,bags_count,furniture_count,small_donation,crew_size,estimated_miles,drive_minutes,onsite_minutes,fuel_cost_per_mile,estimated_cost,images_json,status,created_at)
+VALUES (@donor_name,@donor_email,@donor_phone,@pickup_address,@city,@state,@zip,@categories,@condition,@item_notes,@preferred_date,@preferred_time,@bags_count,@furniture_count,@small_donation,@crew_size,@estimated_miles,@drive_minutes,@onsite_minutes,@fuel_cost_per_mile,@estimated_cost,@images_json,@status,@created_at)`
+).run(t).lastInsertRowid; }
 
-function listTickets() { return db.prepare('SELECT * FROM tickets ORDER BY created_at DESC').all(); }
-function getTicket(id) { return db.prepare('SELECT * FROM tickets WHERE id = ?').get(id); }
-function updateStatus(id, status) { return db.prepare('UPDATE tickets SET status = ? WHERE id = ?').run(status, id); }
-function scheduleTicket(ticket_id, start_iso, end_iso) {
-  db.prepare('INSERT INTO schedules (ticket_id, start_iso, end_iso) VALUES (?,?,?)').run(ticket_id, start_iso, end_iso);
-  db.prepare('UPDATE tickets SET status = ? WHERE id = ?').run('scheduled', ticket_id);
+function listTickets(){ return db.prepare('SELECT * FROM tickets ORDER BY created_at DESC').all(); }
+function getTicket(id){ return db.prepare('SELECT * FROM tickets WHERE id = ?').get(id); }
+function updateStatus(id, s){ return db.prepare('UPDATE tickets SET status=? WHERE id=?').run(s,id); }
+
+function scheduleTicket(ticket_id, start_iso, end_iso){
+  db.prepare('INSERT INTO schedules (ticket_id,start_iso,end_iso) VALUES (?,?,?)').run(ticket_id,start_iso,end_iso);
+  db.prepare('UPDATE tickets SET status=? WHERE id=?').run('scheduled', ticket_id);
 }
-function updateSchedule(id, start_iso, end_iso) { db.prepare('UPDATE schedules SET start_iso = ?, end_iso = ? WHERE id = ?').run(start_iso, end_iso, id); }
-function listScheduled() {
-  return db.prepare(`SELECT schedules.*, tickets.donor_name, tickets.pickup_address 
-                     FROM schedules JOIN tickets ON tickets.id = schedules.ticket_id
-                     ORDER BY start_iso ASC`).all();
-}
-function findConflicts(start_iso, end_iso) {
-  return db.prepare(`SELECT * FROM schedules WHERE NOT (end_iso <= ? OR start_iso >= ?)`)
-           .all(start_iso, end_iso);
-}
-function updateTicketMiles(id, miles){ db.prepare('UPDATE tickets SET estimated_miles = ? WHERE id = ?').run(miles, id); }
-function updateCrewSize(id, crew){ db.prepare('UPDATE tickets SET crew_size = ? WHERE id = ?').run(crew, id); }
+function updateSchedule(id, start_iso, end_iso){ db.prepare('UPDATE schedules SET start_iso=?, end_iso=? WHERE id=?').run(start_iso,end_iso,id); }
+function listScheduled(){ return db.prepare(`SELECT schedules.*, tickets.donor_name, tickets.pickup_address FROM schedules JOIN tickets ON tickets.id=schedules.ticket_id ORDER BY start_iso`).all(); }
+function findConflicts(start_iso, end_iso){ return db.prepare('SELECT * FROM schedules WHERE NOT (end_iso <= ? OR start_iso >= ?)').all(start_iso,end_iso); }
+
+function updateTicketMiles(id, miles){ db.prepare('UPDATE tickets SET estimated_miles=? WHERE id=?').run(miles,id); }
+function updateCrewSize(id, crew){ db.prepare('UPDATE tickets SET crew_size=? WHERE id=?').run(crew,id); }
 function updateTimesAndCost(id, driveMin, onsiteMin, hourly, crew, fuelPerMile, miles){
-  const labor = ((driveMin + onsiteMin)/60.0) * hourly * crew;
+  const labor = (driveMin/60.0) * hourly * crew; // drive-only
   const fuel = (miles||0) * fuelPerMile;
   const total = +(labor + fuel).toFixed(2);
   db.prepare('UPDATE tickets SET drive_minutes=?, onsite_minutes=?, fuel_cost_per_mile=?, estimated_cost=? WHERE id=?')
-    .run(driveMin, onsiteMin, fuelPerMile, total, id);
+    .run(driveMin, 0, fuelPerMile, total, id);
   return { labor, fuel, total };
 }
 
-// Blackout helpers
+// blackout
 function listBlackouts(){ return db.prepare('SELECT * FROM blackout_days ORDER BY date').all(); }
-function addBlackout(date){ try { db.prepare('INSERT INTO blackout_days (date) VALUES (?)').run(date); } catch(e) {} }
-function deleteBlackout(id){ db.prepare('DELETE FROM blackout_days WHERE id = ?').run(id); }
-function isBlackout(date){ const r = db.prepare('SELECT id FROM blackout_days WHERE date = ?').get(date); return !!r; }
+function addBlackout(date){ try{ db.prepare('INSERT INTO blackout_days (date) VALUES (?)').run(date);}catch(e){} }
+function deleteBlackout(id){ db.prepare('DELETE FROM blackout_days WHERE id=?').run(id); }
+function isBlackout(date){ const r = db.prepare('SELECT id FROM blackout_days WHERE date=?').get(date); return !!r; }
 
 module.exports = { init, insertTicket, listTickets, getTicket, updateStatus, scheduleTicket, listScheduled, findConflicts, updateSchedule, updateTicketMiles, updateCrewSize, updateTimesAndCost, listBlackouts, addBlackout, deleteBlackout, isBlackout };
 
 if (require.main === module) {
-  if (process.argv[2] === 'init') { init(); console.log('DB initialized at', dbFile); }
+  if (process.argv[2]==='init'){ init(); console.log('DB initialized at', dbFile); }
 }

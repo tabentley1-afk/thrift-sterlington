@@ -1,35 +1,14 @@
 <% layout('layout') -%>
-<h2 class="mb-3">Schedule a Free Pickup</h2>
+<h2>Schedule a Free Pickup</h2>
 <form action="/tickets" method="post" enctype="multipart/form-data" class="row g-3">
-  <div class="col-md-6">
-    <label class="form-label">Your Name</label>
-    <input required name="donor_name" class="form-control">
-  </div>
-  <div class="col-md-3">
-    <label class="form-label">Email</label>
-    <input type="email" required name="donor_email" class="form-control">
-  </div>
-  <div class="col-md-3">
-    <label class="form-label">Phone</label>
-    <input required name="donor_phone" class="form-control">
-  </div>
+  <div class="col-md-6"><label class="form-label">Your Name</label><input name="donor_name" required class="form-control"></div>
+  <div class="col-md-3"><label class="form-label">Email</label><input type="email" name="donor_email" required class="form-control"></div>
+  <div class="col-md-3"><label class="form-label">Phone</label><input name="donor_phone" required class="form-control"></div>
 
-  <div class="col-md-8">
-    <label class="form-label">Pickup Address</label>
-    <input required name="pickup_address" class="form-control" placeholder="Street address">
-  </div>
-  <div class="col-md-2">
-    <label class="form-label">City</label>
-    <input name="city" class="form-control">
-  </div>
-  <div class="col-md-1">
-    <label class="form-label">State</label>
-    <input name="state" class="form-control">
-  </div>
-  <div class="col-md-1">
-    <label class="form-label">ZIP</label>
-    <input name="zip" class="form-control">
-  </div>
+  <div class="col-md-8"><label class="form-label">Pickup Address</label><input name="pickup_address" required class="form-control"></div>
+  <div class="col-md-2"><label class="form-label">City</label><input name="city" class="form-control"></div>
+  <div class="col-md-1"><label class="form-label">State</label><input name="state" class="form-control"></div>
+  <div class="col-md-1"><label class="form-label">ZIP</label><input name="zip" class="form-control"></div>
 
   <div class="col-12">
     <label class="form-label">Items (select all that apply)</label>
@@ -42,46 +21,19 @@
     </div>
   </div>
 
-  <div class="col-md-4">
-    <label class="form-label">Overall Condition</label>
-    <select name="condition" class="form-select">
-      <option>Excellent</option>
-      <option>Good</option>
-      <option>Bad</option>
-      <option>Worse</option>
-    </select>
+  <div class="col-md-4"><label class="form-label">Overall Condition</label>
+    <select name="condition" class="form-select"><option>Excellent</option><option>Good</option><option>Bad</option><option>Worse</option></select>
   </div>
+  <div class="col-md-8"><label class="form-label">Notes</label><textarea name="item_notes" rows="3" class="form-control"></textarea></div>
 
-  <div class="col-md-8">
-    <label class="form-label">Notes (item list, stairs, gate codes, etc.)</label>
-    <textarea name="item_notes" class="form-control" rows="3"></textarea>
-  </div>
+  <div class="col-md-4"><label class="form-label">Preferred Date</label><input type="date" name="preferred_date" class="form-control"></div>
+  <div class="col-md-4"><label class="form-label">Preferred Time (≥ 9:30 AM)</label><input type="time" name="preferred_time" class="form-control" min="09:30" max="17:00"></div>
 
-  <div class="col-md-4">
-    <label class="form-label">Preferred Date</label>
-    <input type="date" name="preferred_date" class="form-control">
-  </div>
-  <div class="col-md-4">
-    <label class="form-label">Preferred Time (earliest 9:30 AM CT)</label>
-    <input type="time" name="preferred_time" class="form-control" min="09:30" max="17:00">
-  </div>
-
-  <div class="col-md-3">
-    <label class="form-label">Bags of clothing</label>
-    <input type="number" min="0" step="1" name="bags_count" class="form-control" value="0">
-  </div>
-  <div class="col-md-3">
-    <label class="form-label">Pieces of furniture</label>
-    <input type="number" min="0" step="1" name="furniture_count" class="form-control" value="0">
-  </div>
+  <div class="col-md-3"><label class="form-label">Bags of clothing</label><input type="number" name="bags_count" value="0" min="0" step="1" class="form-control"></div>
+  <div class="col-md-3"><label class="form-label">Pieces of furniture</label><input type="number" name="furniture_count" value="0" min="0" step="1" class="form-control"></div>
   <div class="col-md-3 d-flex align-items-end">
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" name="small_donation" id="smallDonation">
-      <label class="form-check-label" for="smallDonation">Small donation</label>
-    </div>
+    <div class="form-check"><input class="form-check-input" type="checkbox" name="small_donation" id="smallDonation"><label for="smallDonation" class="form-check-label">Small donation</label></div>
   </div>
 
-  <div class="col-12">
-    <button class="btn btn-primary mt-3">Submit Pickup Request</button>
-  </div>
+  <div class="col-12"><button class="btn btn-primary mt-2">Submit Pickup Request</button></div>
 </form>
