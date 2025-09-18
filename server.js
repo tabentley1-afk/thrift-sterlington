@@ -1,7 +1,3 @@
-// server.js (drop-in)
-// Change log:
-// - Normalize categories so a single checkbox (string) becomes ["value"].
-
 require('dotenv').config();
 process.env.TZ = process.env.TZ || 'America/Chicago';
 
@@ -25,26 +21,28 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(helmet());
+app.use(helmet({ crossOriginEmbedderPolicy: false }));
 app.use(morgan('dev'));
 
-// uploads path (persistent if env provided)
 const uploadBase = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 fs.mkdirSync(uploadBase, { recursive: true });
 app.use('/uploads', express.static(uploadBase));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
-app.use(session({ secret: process.env.SESSION_SECRET || 'thrift-secret', resave: false, saveUninitialized: false }));
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'thrift-secret',
+  resave: false,
+  saveUninitialized: false
+}));
 function requireAdmin(req,res,next){ if (req.session?.isAdmin) return next(); res.redirect('/admin'); }
 
-// uploads config
 const storage = multer.diskStorage({
   destination: (req,file,cb)=>cb(null, uploadBase),
   filename: (req,file,cb)=>cb(null, Date.now()+'-'+Math.round(Math.random()*1e9)+'-'+file.originalname.replace(/\s+/g,'_'))
 });
 const upload = multer({ storage });
 
-// Distance helper: miles & minutes (one way) → we'll double for RT
+// Distance helper (one-way values)
 async function getDistance(origin, destination) {
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) throw new Error('GOOGLE_MAPS_API_KEY missing');
@@ -76,38 +74,74 @@ function validateBusinessHoursCT(start, end){
   return { ok:true };
 }
 
-// routes
+// ----- Public -----
 app.get('/', (req,res)=>res.redirect('/donate'));
 app.get('/donate', (req,res)=>res.render('donor_form'));
 
-// 🔧 FIXED: normalize categories to an array so single checkbox doesn't break
-app.post('/tickets', upload.array('item_images',10), (req,res)=>{
+// Create ticket (images + required validation + categories fix)
+app.post('/tickets', upload.array('item_images', 10), (req, res) => {
   const b = req.body;
-  const files = (req.files||[]).map(f=>f.filename);
 
-  // Normalize categories: can be undefined, string, or array
+  // categories can be string or array; require at least one
   let cats = b.categories;
   if (!Array.isArray(cats)) cats = cats ? [cats] : [];
+  if (cats.length === 0) return res.status(400).send('Please select at least one item category.');
+
+  // Required fields
+  const required = {
+    donor_name: 'Name',
+    donor_email: 'Email',
+    donor_phone: 'Phone',
+    pickup_address: 'Address',
+    city: 'City',
+    state: 'State',
+    zip: 'ZIP',
+    item_notes: 'Short description / notes',
+    preferred_date: 'Preferred date',
+    preferred_time: 'Preferred time'
+  };
+  for (const k in required) {
+    if (!b[k] || String(b[k]).trim() === '') {
+      return res.status(400).send(`Missing required field: ${required[k]}`);
+    }
+  }
+
+  const state = String(b.state || '').toUpperCase().slice(0,2);
+  const zip   = String(b.zip || '').slice(0,5);
+  const files = (req.files || []).map(f => f.filename);
 
   const ticket = {
-    donor_name: b.donor_name, donor_email: b.donor_email, donor_phone: b.donor_phone,
-    pickup_address: b.pickup_address, city: b.city, state: b.state, zip: b.zip,
-    categories: JSON.stringify(cats),           // <-- store as JSON array
-    condition: b.condition, item_notes: b.item_notes,
-    preferred_date: b.preferred_date || null, preferred_time: b.preferred_time || null,
-    bags_count: parseInt(b.bags_count||0)||0,
-    furniture_count: parseInt(b.furniture_count||0)||0,
+    donor_name: b.donor_name.trim(),
+    donor_email: b.donor_email.trim(),
+    donor_phone: b.donor_phone.trim(),
+    pickup_address: b.pickup_address.trim(),
+    city: b.city.trim(),
+    state,
+    zip,
+    categories: JSON.stringify(cats),
+    condition: b.condition || 'Good',
+    item_notes: b.item_notes.trim(),
+    preferred_date: b.preferred_date,
+    preferred_time: b.preferred_time,
+    bags_count: parseInt(b.bags_count || 0) || 0,
+    furniture_count: parseInt(b.furniture_count || 0) || 0,
     small_donation: b.small_donation ? 1 : 0,
-    crew_size: 1, estimated_miles: 0, drive_minutes: 0, onsite_minutes:0,
-    fuel_cost_per_mile: parseFloat(process.env.FUEL_COST_PER_MILE||0.2),
-    estimated_cost: 0, images_json: JSON.stringify(files),
-    status: 'new', created_at: DateTime.now().setZone(CT_ZONE).toISO()
+    crew_size: 1,
+    estimated_miles: 0,
+    drive_minutes: 0,
+    onsite_minutes: 0,
+    fuel_cost_per_mile: parseFloat(process.env.FUEL_COST_PER_MILE || 0.2),
+    estimated_cost: 0,
+    images_json: JSON.stringify(files),
+    status: 'new',
+    created_at: DateTime.now().setZone(CT_ZONE).toISO()
   };
+
   const id = db.insertTicket(ticket);
   res.render('thank_you', { id, ticket });
 });
 
-// admin auth
+// ----- Admin -----
 app.get('/admin', (req,res)=>{ if (req.session?.isAdmin) return res.redirect('/admin/tickets'); res.render('admin_login', { err:null }); });
 app.post('/admin', (req,res)=>{
   if ((req.body.secret||'') === (process.env.ADMIN_SECRET||'password')) { req.session.isAdmin = true; return res.redirect('/admin/tickets'); }
@@ -115,13 +149,12 @@ app.post('/admin', (req,res)=>{
 });
 app.get('/admin/logout', (req,res)=>{ req.session.destroy(()=>res.redirect('/admin')); });
 
-// admin list
 app.get('/admin/tickets', requireAdmin, (req,res)=>{
   const tickets = db.listTickets();
   res.render('admin_list', { tickets, CT_ZONE });
 });
 
-// admin ticket detail with AUTO RECALC
+// Auto-recalc miles & drive time on open
 app.get('/admin/tickets/:id', requireAdmin, (req, res) => {
   (async () => {
     const t0 = db.getTicket(req.params.id);
@@ -149,8 +182,7 @@ app.get('/admin/tickets/:id', requireAdmin, (req, res) => {
     db.updateTimesAndCost(t0.id, driveMinRT, 0, hourly, crew, fuelPerMile, milesRT);
 
     const t = db.getTicket(req.params.id);
-
-    function safeArrayJSON(x){ if(!x) return []; try{ return Array.isArray(x)?x:JSON.parse(x);}catch{ return String(x).split(',').map(s=>s.trim()).filter(Boolean);} }
+    function safeArrayJSON(x){ if(!x) return []; try{ return Array.isArray(x)?x:JSON.parse(x);}catch{ return String(x).split(',').map(s => s.trim()).filter(Boolean);} }
     const view = { ...t, categoriesArray: safeArrayJSON(t.categories), estimatedCostNumber: Number(t.estimated_cost||0) };
     res.render('ticket_detail', { t:view, CT_ZONE });
   })();
@@ -164,7 +196,6 @@ app.post('/admin/tickets/:id/status', requireAdmin, (req,res)=>{
   res.redirect('/admin/tickets/'+req.params.id);
 });
 
-// time/cost update: uses stored drive minutes (auto) + latest miles
 app.post('/admin/tickets/:id/timecost', requireAdmin, (req,res)=>{
   const t = db.getTicket(req.params.id);
   if(!t) return res.status(404).send('Ticket not found');
@@ -179,18 +210,13 @@ app.post('/admin/tickets/:id/timecost', requireAdmin, (req,res)=>{
   res.redirect('/admin/tickets/'+t.id);
 });
 
-// schedule & calendar
-app.get('/admin/availability', requireAdmin, (req,res)=>{
-  const events = db.listScheduled();
-  res.render('availability', { events, CT_ZONE });
-});
+// Schedule & calendar endpoints (same as before)
+app.get('/admin/availability', requireAdmin, (req,res)=>{ res.render('availability', { events: db.listScheduled(), CT_ZONE }); });
 app.get('/admin/calendar', requireAdmin, (req,res)=>res.render('admin_calendar'));
 app.get('/api/schedule', requireAdmin, (req,res)=>{
   const events = db.listScheduled().map(e=>({ id:e.id, title:`#${e.ticket_id} - ${e.donor_name}`, start:e.start_iso, end:e.end_iso }));
   res.json(events);
 });
-
-// blackout manager + api
 app.get('/admin/blackouts', requireAdmin, (req,res)=>{ res.render('admin_blackouts', { days: db.listBlackouts(), CT_ZONE }); });
 app.post('/admin/blackouts', requireAdmin, (req,res)=>{ const d=String(req.body.date||'').trim(); if(d) db.addBlackout(d); res.redirect('/admin/blackouts'); });
 app.post('/admin/blackouts/:id/delete', requireAdmin, (req,res)=>{ db.deleteBlackout(req.params.id); res.redirect('/admin/blackouts'); });
@@ -199,8 +225,6 @@ app.get('/api/blackouts', requireAdmin, (req,res)=>{
   const days = db.listBlackouts();
   res.json(days.map(d=>({ start:d.date, end: DateTime.fromISO(d.date).plus({days:1}).toISODate(), display:'background', backgroundColor:'#ffd6d6' })));
 });
-
-// scheduling actions
 app.post('/admin/tickets/:id/schedule', requireAdmin, (req,res)=>{
   const start = DateTime.fromISO(req.body.start_iso, { zone: CT_ZONE });
   const end = start.plus({ hours: parseFloat(req.body.duration_hours||1) });
@@ -241,7 +265,7 @@ app.get('/admin/export.csv', requireAdmin, (req,res)=>{
   res.end();
 });
 
-// error handler
+// Error handler
 app.use((err, req, res, next)=>{ console.error('Unhandled error:', err); res.status(500).send('Internal Server Error'); });
 
 app.listen(PORT, ()=>{ db.init(); console.log(`Server running on http://localhost:${PORT}`); });
