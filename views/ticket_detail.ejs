@@ -79,8 +79,8 @@ function fmtTime12(x){ return x ? x.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+
         </select>
         <button class="btn btn-outline-secondary w-100">Update Status</button>
       </form>
-      <!-- Delete button -->
-      <form method="post" action="/admin/tickets/<%= t.id %>/delete" onsubmit="return confirm('Delete this ticket permanently?');">
+      <!-- Delete with confirm -->
+      <form method="post" action="/admin/tickets/<%= t.id %>/delete" onsubmit="return confirm('Delete this ticket permanently? This cannot be undone.');">
         <button class="btn btn-danger w-100 mt-2">Delete Ticket</button>
       </form>
     </div></div>
