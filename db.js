@@ -82,6 +82,25 @@ function addBlackout(date){ try{ db.prepare('INSERT INTO blackout_days (date) VA
 function deleteBlackout(id){ db.prepare('DELETE FROM blackout_days WHERE id=?').run(id); }
 function isBlackout(date){ const r = db.prepare('SELECT id FROM blackout_days WHERE date=?').get(date); return !!r; }
 
+// Delete a ticket and its schedule rows
+function deleteTicket(id) {
+  const delSched = db.prepare('DELETE FROM schedule WHERE ticket_id = ?');
+  delSched.run(id);
+  const delT = db.prepare('DELETE FROM tickets WHERE id = ?');
+  delT.run(id);
+}
+
+// Remove scheduled event(s) by ticket id (used before deletion)
+function unscheduleTicketByTicketId(ticketId){
+  const stmt = db.prepare('DELETE FROM schedule WHERE ticket_id = ?');
+  stmt.run(ticketId);
+}
+
+// export them
+module.exports.deleteTicket = deleteTicket;
+module.exports.unscheduleTicketByTicketId = unscheduleTicketByTicketId;
+
+
 module.exports = { init, insertTicket, listTickets, getTicket, updateStatus, scheduleTicket, listScheduled, findConflicts, updateSchedule, updateTicketMiles, updateCrewSize, updateTimesAndCost, listBlackouts, addBlackout, deleteBlackout, isBlackout };
 
 if (require.main === module) {
