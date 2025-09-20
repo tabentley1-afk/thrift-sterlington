@@ -2,7 +2,6 @@
 <h3>Ticket #<%= t.id %></h3>
 
 <%
-// --- Safe helpers for this template only ---
 let imgs = [];
 try {
   if (Array.isArray(t.images_json)) { imgs = t.images_json; }
@@ -12,6 +11,7 @@ try {
   }
 } catch(e) { imgs = []; }
 const cats = (t.categoriesArray && Array.isArray(t.categoriesArray)) ? t.categoriesArray : [];
+function fmtTime12(x){ return x ? x.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+h;const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+mm+' '+ap;}) : ''; }
 %>
 
 <div class="row">
@@ -25,9 +25,7 @@ const cats = (t.categoriesArray && Array.isArray(t.categoriesArray)) ? t.categor
         <p><strong>Condition:</strong> <%= t.condition %></p>
         <p><strong>Notes:</strong> <%= t.item_notes %></p>
         <p><strong>Bags:</strong> <%= t.bags_count||0 %> • <strong>Furniture:</strong> <%= t.furniture_count||0 %> • <strong>Small:</strong> <%= (t.small_donation? 'Yes':'No') %></p>
-        <p><strong>Preferred:</strong> <%= t.preferred_date||'' %>
-          <%= t.preferred_time? (t.preferred_time.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+h;const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+mm+' '+ap;})) : '' %> (CT)
-        </p>
+        <p><strong>Preferred:</strong> <%= t.preferred_date||'' %> <%= fmtTime12(t.preferred_time) %> (CT)</p>
 
         <% if (imgs.length) { %>
           <hr/>
@@ -80,6 +78,10 @@ const cats = (t.categoriesArray && Array.isArray(t.categoriesArray)) ? t.categor
           <option value="canceled" <%= t.status==='canceled'?'selected':'' %>>Canceled</option>
         </select>
         <button class="btn btn-outline-secondary w-100">Update Status</button>
+      </form>
+      <!-- Delete button -->
+      <form method="post" action="/admin/tickets/<%= t.id %>/delete" onsubmit="return confirm('Delete this ticket permanently?');">
+        <button class="btn btn-danger w-100 mt-2">Delete Ticket</button>
       </form>
     </div></div>
 
