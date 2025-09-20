@@ -1,16 +1,22 @@
 <!DOCTYPE html>
-<html><head>
+<html>
+<head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Thrive on Thrift Pickups</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/public/css/styles.css">
+  <!-- Favicon -->
+  <link rel="icon" href="/public/logo.png" type="image/png">
 </head>
 <body>
 <nav class="navbar navbar-dark bg-dark navbar-expand-lg mb-4">
   <div class="container">
-    <a class="navbar-brand" href="/donate">Thrive on Thrift</a>
-    <div class="navbar-nav">
+    <a class="navbar-brand d-flex align-items-center" href="/donate">
+      <img src="/public/logo.png" alt="Thrive on Thrift" style="height:40px;width:40px;border-radius:50%;margin-right:8px;">
+      Thrive on Thrift
+    </a>
+    <div class="navbar-nav ms-auto">
       <a class="nav-link" href="/donate">Donate</a>
       <a class="nav-link" href="/admin">Admin</a>
     </div>
@@ -20,7 +26,9 @@
   <div class="alert alert-info py-2">
     Store hours: <strong>9:00 AM – 5:00 PM (CT)</strong>. Pickups start at <strong>9:30 AM</strong>.
   </div>
+
   <%- body %>
+
   <footer class="mt-5">
     <hr/>
     <div class="row small">
@@ -38,4 +46,5 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/public/js/app.js"></script>
-</body></html>
+</body>
+</html>
