@@ -71,6 +71,28 @@ function validateBusinessHoursCT(start, end){
 }
 function toCT(dtISO){ return DateTime.fromISO(dtISO).setZone(CT_ZONE); }
 
+// central delete helper (images + schedules + row)
+function deleteAssetsForTicket(ticket) {
+  if (!ticket) return;
+  // remove scheduled events
+  db.unscheduleTicketByTicketId(ticket.id);
+  // remove images
+  try{
+    let imgs = [];
+    if (ticket.images_json) {
+      try { imgs = Array.isArray(ticket.images_json) ? ticket.images_json : JSON.parse(ticket.images_json); }
+      catch { imgs = String(ticket.images_json).split(',').map(s=>s.trim()).filter(Boolean); }
+    }
+    imgs.forEach(fn=>{
+      const p = path.join(uploadBase, fn);
+      // safety: ensure file lives under uploads
+      if (p.startsWith(uploadBase) && fs.existsSync(p)) fs.unlinkSync(p);
+    });
+  }catch(e){ console.error('delete images error', e); }
+  // delete ticket row
+  db.deleteTicket(ticket.id);
+}
+
 // ====== public ======
 app.get('/', (req,res)=>res.redirect('/donate'));
 app.get('/donate', (req,res)=>res.render('donor_form'));
@@ -125,7 +147,13 @@ app.get('/admin/tickets/:id', requireAdmin, (req, res) => {
     const ORIGIN = '10010 US-165, Sterlington, LA 71280';
     const dest = [t0.pickup_address, t0.city, t0.state, t0.zip].filter(Boolean).join(', ');
     let milesRT = Number(t0.estimated_miles||0), driveMinRT = Number(t0.drive_minutes||0);
-    try{ const { milesOneWay, minutesOneWay } = await getDistance(ORIGIN, dest); milesRT = +(milesOneWay*2).toFixed(1); driveMinRT = Math.round(minutesOneWay*2); db.updateTicketMiles(t0.id, milesRT); }catch(e){ console.error('auto-recalc distance error', e); }
+    try{
+      const { milesOneWay, minutesOneWay } = await getDistance(ORIGIN, dest);
+      milesRT = +(milesOneWay*2).toFixed(1);
+      driveMinRT = Math.round(minutesOneWay*2);
+      db.updateTicketMiles(t0.id, milesRT);
+    }catch(e){ console.error('auto-recalc distance error', e); }
+
     const crew = suggestCrewSize({ bags: parseInt(t0.bags_count||0)||0, furniture: parseInt(t0.furniture_count||0)||0, small: parseInt(t0.small_donation||0)||0 });
     db.updateCrewSize(t0.id, crew);
     const hourly = parseFloat(process.env.EMPLOYEE_HOURLY||10), fuelPerMile = parseFloat(t0.fuel_cost_per_mile||0.2);
@@ -141,29 +169,25 @@ app.get('/admin/tickets/:id', requireAdmin, (req, res) => {
 app.post('/admin/tickets/:id/status', requireAdmin, (req,res)=>{ const valid=new Set(['new','scheduled','completed','canceled']); const s=String(req.body.status||'').toLowerCase(); if(!valid.has(s)) return res.status(400).send('Invalid status'); db.updateStatus(req.params.id, s); res.redirect('/admin/tickets/'+req.params.id); });
 app.post('/admin/tickets/:id/timecost', requireAdmin, (req,res)=>{ const t=db.getTicket(req.params.id); if(!t) return res.status(404).send('Ticket not found'); const hourly=parseFloat(process.env.EMPLOYEE_HOURLY||10); const crew=parseInt(req.body.crew_size||t.crew_size||1); const fuelPerMile=parseFloat(req.body.fuel_cost_per_mile||t.fuel_cost_per_mile||0.2); const fresh=db.getTicket(req.params.id); const miles=parseFloat(fresh.estimated_miles||0)||0; const drive=parseFloat(fresh.drive_minutes||0)||0; db.updateCrewSize(t.id, crew); db.updateTimesAndCost(t.id, drive, 0, hourly, crew, fuelPerMile, miles); res.redirect('/admin/tickets/'+t.id); });
 
-// NEW: delete ticket
+// SINGLE delete (with image cleanup)
 app.post('/admin/tickets/:id/delete', requireAdmin, (req,res)=>{
   const t = db.getTicket(req.params.id);
-  if(!t) return res.redirect('/admin/tickets');
+  if (t) deleteAssetsForTicket(t);
+  res.redirect('/admin/tickets');
+});
 
-  // remove any scheduled event for this ticket
-  db.unscheduleTicketByTicketId(t.id);
+// BULK delete: expects form fields named "ids"
+app.post('/admin/tickets/bulk-delete', requireAdmin, (req,res)=>{
+  let ids = req.body.ids || [];
+  if (!Array.isArray(ids)) ids = [ids];
+  // strip invalids
+  ids = ids.map(x=>parseInt(x)).filter(n=>Number.isInteger(n));
+  if (!ids.length) return res.redirect('/admin/tickets');
 
-  // delete image files
-  try{
-    const imgs = (() => {
-      if (!t.images_json) return [];
-      try { return Array.isArray(t.images_json) ? t.images_json : JSON.parse(t.images_json); }
-      catch { return String(t.images_json).split(',').map(s=>s.trim()).filter(Boolean); }
-    })();
-    imgs.forEach(fn=>{
-      const p = path.join(uploadBase, fn);
-      if (p.startsWith(uploadBase) && fs.existsSync(p)) fs.unlinkSync(p);
-    });
-  } catch(e){ console.error('delete images error', e); }
-
-  // delete the ticket itself
-  db.deleteTicket(t.id);
+  ids.forEach(id=>{
+    const t = db.getTicket(id);
+    if (t) deleteAssetsForTicket(t);
+  });
 
   res.redirect('/admin/tickets');
 });
@@ -181,9 +205,6 @@ app.post('/admin/tickets/:id/schedule', requireAdmin, (req,res)=>{ const start=D
 app.post('/admin/schedule/:id/move', requireAdmin, (req,res)=>{ const start=DateTime.fromISO(req.body.start_iso,{zone:CT_ZONE}); const end=DateTime.fromISO(req.body.end_iso,{zone:CT_ZONE}); const b=validateBusinessHoursCT(start,end); if(!b.ok) return res.status(409).json({error:b.msg}); const conflicts=db.findConflicts(start.toISO(),end.toISO()).filter(e=>String(e.id)!==String(req.params.id)); if(conflicts.length) return res.status(409).json({error:'Conflict'}); db.updateSchedule(req.params.id,start.toISO(),end.toISO()); res.json({ok:true}); });
 
 app.get('/admin/export.csv', requireAdmin, (req,res)=>{ const rows=db.listTickets(); const headers=['id','created_at','status','donor_name','donor_email','donor_phone','pickup_address','city','state','zip','categories','condition','item_notes','preferred_date','preferred_time','bags_count','furniture_count','small_donation','crew_size','estimated_miles','drive_minutes','fuel_cost_per_mile','estimated_cost']; res.setHeader('Content-Type','text/csv'); res.setHeader('Content-Disposition','attachment; filename="tickets.csv"'); res.write(headers.join(',')+'\n'); for(const r of rows){ const vals=headers.map(h=>{let v=r[h]; if(h==='categories'&&typeof v==='string'){try{v=JSON.parse(v).join('|')}catch{}} if(typeof v==='string') v=`"${v.replace(/"/g,'""')}"`; return v??''}); res.write(vals.join(',')+'\n'); } res.end(); });
-
-// ====== reports (unchanged if you have them) ======
-// ... keep your /admin/reports routes if present ...
 
 // errors + start
 app.use((err, req, res, next)=>{ console.error('Unhandled error:', err); res.status(500).send('Internal Server Error'); });
