@@ -9,18 +9,16 @@
   <!-- Favicon -->
   <link rel="icon" href="/public/logo.png" type="image/png">
   <style>
-    /* Responsive logo sizing */
+    /* Logo styling: preserve aspect ratio */
     .brand-logo {
-      height: 40px;
-      width: 40px;
-      border-radius: 50%;
+      height: 40px;       /* control height only */
+      width: auto;        /* let width adjust naturally */
+      object-fit: contain;
       margin-right: 8px;
     }
     @media (max-width: 576px) {
       .brand-logo {
         height: 28px;
-        width: 28px;
-        margin-right: 6px;
       }
     }
   </style>
