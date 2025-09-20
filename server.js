@@ -29,11 +29,7 @@ fs.mkdirSync(uploadBase, { recursive: true });
 app.use('/uploads', express.static(uploadBase));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'thrift-secret',
-  resave: false,
-  saveUninitialized: false
-}));
+app.use(session({ secret: process.env.SESSION_SECRET || 'thrift-secret', resave: false, saveUninitialized: false }));
 function requireAdmin(req,res,next){ if (req.session?.isAdmin) return next(); res.redirect('/admin'); }
 
 const storage = multer.diskStorage({
@@ -42,7 +38,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Distance helper (one-way values)
+// ====== helpers ======
 async function getDistance(origin, destination) {
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) throw new Error('GOOGLE_MAPS_API_KEY missing');
@@ -73,88 +69,54 @@ function validateBusinessHoursCT(start, end){
   if (eHour > 17) return { ok:false, msg:'End must be at or before 5:00 PM CT.' };
   return { ok:true };
 }
+function toCT(dtISO){ return DateTime.fromISO(dtISO).setZone(CT_ZONE); }
 
-// ----- Public -----
+// ====== public ======
 app.get('/', (req,res)=>res.redirect('/donate'));
 app.get('/donate', (req,res)=>res.render('donor_form'));
 
-// Create ticket (images + required validation + categories fix)
+// normalize categories + require fields + images
 app.post('/tickets', upload.array('item_images', 10), (req, res) => {
   const b = req.body;
 
-  // categories can be string or array; require at least one
   let cats = b.categories;
   if (!Array.isArray(cats)) cats = cats ? [cats] : [];
   if (cats.length === 0) return res.status(400).send('Please select at least one item category.');
 
-  // Required fields
   const required = {
-    donor_name: 'Name',
-    donor_email: 'Email',
-    donor_phone: 'Phone',
-    pickup_address: 'Address',
-    city: 'City',
-    state: 'State',
-    zip: 'ZIP',
-    item_notes: 'Short description / notes',
-    preferred_date: 'Preferred date',
-    preferred_time: 'Preferred time'
+    donor_name: 'Name', donor_email: 'Email', donor_phone: 'Phone',
+    pickup_address: 'Address', city: 'City', state: 'State', zip: 'ZIP',
+    item_notes: 'Short description / notes', preferred_date: 'Preferred date', preferred_time: 'Preferred time'
   };
-  for (const k in required) {
-    if (!b[k] || String(b[k]).trim() === '') {
-      return res.status(400).send(`Missing required field: ${required[k]}`);
-    }
-  }
+  for (const k in required) if (!b[k] || String(b[k]).trim() === '') return res.status(400).send(`Missing required field: ${required[k]}`);
 
-  const state = String(b.state || '').toUpperCase().slice(0,2);
-  const zip   = String(b.zip || '').slice(0,5);
-  const files = (req.files || []).map(f => f.filename);
+  const state = String(b.state||'').toUpperCase().slice(0,2);
+  const zip   = String(b.zip||'').slice(0,5);
+  const files = (req.files||[]).map(f=>f.filename);
 
   const ticket = {
-    donor_name: b.donor_name.trim(),
-    donor_email: b.donor_email.trim(),
-    donor_phone: b.donor_phone.trim(),
-    pickup_address: b.pickup_address.trim(),
-    city: b.city.trim(),
-    state,
-    zip,
-    categories: JSON.stringify(cats),
-    condition: b.condition || 'Good',
-    item_notes: b.item_notes.trim(),
-    preferred_date: b.preferred_date,
-    preferred_time: b.preferred_time,
-    bags_count: parseInt(b.bags_count || 0) || 0,
-    furniture_count: parseInt(b.furniture_count || 0) || 0,
-    small_donation: b.small_donation ? 1 : 0,
-    crew_size: 1,
-    estimated_miles: 0,
-    drive_minutes: 0,
-    onsite_minutes: 0,
+    donor_name: b.donor_name.trim(), donor_email: b.donor_email.trim(), donor_phone: b.donor_phone.trim(),
+    pickup_address: b.pickup_address.trim(), city: b.city.trim(), state, zip,
+    categories: JSON.stringify(cats), condition: b.condition || 'Good', item_notes: b.item_notes.trim(),
+    preferred_date: b.preferred_date, preferred_time: b.preferred_time,
+    bags_count: parseInt(b.bags_count||0)||0, furniture_count: parseInt(b.furniture_count||0)||0, small_donation: b.small_donation?1:0,
+    crew_size: 1, estimated_miles: 0, drive_minutes: 0, onsite_minutes: 0,
     fuel_cost_per_mile: parseFloat(process.env.FUEL_COST_PER_MILE || 0.2),
-    estimated_cost: 0,
-    images_json: JSON.stringify(files),
-    status: 'new',
-    created_at: DateTime.now().setZone(CT_ZONE).toISO()
+    estimated_cost: 0, images_json: JSON.stringify(files),
+    status: 'new', created_at: DateTime.now().setZone(CT_ZONE).toISO()
   };
-
   const id = db.insertTicket(ticket);
   res.render('thank_you', { id, ticket });
 });
 
-// ----- Admin -----
+// ====== admin ======
 app.get('/admin', (req,res)=>{ if (req.session?.isAdmin) return res.redirect('/admin/tickets'); res.render('admin_login', { err:null }); });
-app.post('/admin', (req,res)=>{
-  if ((req.body.secret||'') === (process.env.ADMIN_SECRET||'password')) { req.session.isAdmin = true; return res.redirect('/admin/tickets'); }
-  res.render('admin_login', { err:'Invalid secret' });
-});
+app.post('/admin', (req,res)=>{ if ((req.body.secret||'') === (process.env.ADMIN_SECRET||'password')) { req.session.isAdmin = true; return res.redirect('/admin/tickets'); } res.render('admin_login', { err:'Invalid secret' }); });
 app.get('/admin/logout', (req,res)=>{ req.session.destroy(()=>res.redirect('/admin')); });
 
-app.get('/admin/tickets', requireAdmin, (req,res)=>{
-  const tickets = db.listTickets();
-  res.render('admin_list', { tickets, CT_ZONE });
-});
+app.get('/admin/tickets', requireAdmin, (req,res)=>{ res.render('admin_list', { tickets: db.listTickets(), CT_ZONE }); });
 
-// Auto-recalc miles & drive time on open
+// auto recalc on open
 app.get('/admin/tickets/:id', requireAdmin, (req, res) => {
   (async () => {
     const t0 = db.getTicket(req.params.id);
@@ -162,110 +124,67 @@ app.get('/admin/tickets/:id', requireAdmin, (req, res) => {
 
     const ORIGIN = '10010 US-165, Sterlington, LA 71280';
     const dest = [t0.pickup_address, t0.city, t0.state, t0.zip].filter(Boolean).join(', ');
-    let milesRT = Number(t0.estimated_miles || 0);
-    let driveMinRT = Number(t0.drive_minutes || 0);
-    try{
-      const { milesOneWay, minutesOneWay } = await getDistance(ORIGIN, dest);
-      milesRT = +(milesOneWay * 2).toFixed(1);
-      driveMinRT = Math.round(minutesOneWay * 2);
-      db.updateTicketMiles(t0.id, milesRT);
-    }catch(e){ console.error('auto-recalc distance error', e); }
-
-    const crew = suggestCrewSize({
-      bags: parseInt(t0.bags_count||0)||0,
-      furniture: parseInt(t0.furniture_count||0)||0,
-      small: parseInt(t0.small_donation||0)||0
-    });
+    let milesRT = Number(t0.estimated_miles||0), driveMinRT = Number(t0.drive_minutes||0);
+    try{ const { milesOneWay, minutesOneWay } = await getDistance(ORIGIN, dest); milesRT = +(milesOneWay*2).toFixed(1); driveMinRT = Math.round(minutesOneWay*2); db.updateTicketMiles(t0.id, milesRT); }catch(e){ console.error('auto-recalc distance error', e); }
+    const crew = suggestCrewSize({ bags: parseInt(t0.bags_count||0)||0, furniture: parseInt(t0.furniture_count||0)||0, small: parseInt(t0.small_donation||0)||0 });
     db.updateCrewSize(t0.id, crew);
-    const hourly = parseFloat(process.env.EMPLOYEE_HOURLY||10);
-    const fuelPerMile = parseFloat(t0.fuel_cost_per_mile||0.2);
+    const hourly = parseFloat(process.env.EMPLOYEE_HOURLY||10), fuelPerMile = parseFloat(t0.fuel_cost_per_mile||0.2);
     db.updateTimesAndCost(t0.id, driveMinRT, 0, hourly, crew, fuelPerMile, milesRT);
 
     const t = db.getTicket(req.params.id);
-    function safeArrayJSON(x){ if(!x) return []; try{ return Array.isArray(x)?x:JSON.parse(x);}catch{ return String(x).split(',').map(s => s.trim()).filter(Boolean);} }
+    function safeArrayJSON(x){ if(!x) return []; try{ return Array.isArray(x)?x:JSON.parse(x);}catch{ return String(x).split(',').map(s=>s.trim()).filter(Boolean);} }
     const view = { ...t, categoriesArray: safeArrayJSON(t.categories), estimatedCostNumber: Number(t.estimated_cost||0) };
     res.render('ticket_detail', { t:view, CT_ZONE });
   })();
 });
 
-app.post('/admin/tickets/:id/status', requireAdmin, (req,res)=>{
-  const valid = new Set(['new','scheduled','completed','canceled']);
-  const s = String(req.body.status||'').toLowerCase();
-  if(!valid.has(s)) return res.status(400).send('Invalid status');
-  db.updateStatus(req.params.id, s);
-  res.redirect('/admin/tickets/'+req.params.id);
-});
+app.post('/admin/tickets/:id/status', requireAdmin, (req,res)=>{ const valid=new Set(['new','scheduled','completed','canceled']); const s=String(req.body.status||'').toLowerCase(); if(!valid.has(s)) return res.status(400).send('Invalid status'); db.updateStatus(req.params.id, s); res.redirect('/admin/tickets/'+req.params.id); });
+app.post('/admin/tickets/:id/timecost', requireAdmin, (req,res)=>{ const t=db.getTicket(req.params.id); if(!t) return res.status(404).send('Ticket not found'); const hourly=parseFloat(process.env.EMPLOYEE_HOURLY||10); const crew=parseInt(req.body.crew_size||t.crew_size||1); const fuelPerMile=parseFloat(req.body.fuel_cost_per_mile||t.fuel_cost_per_mile||0.2); const fresh=db.getTicket(req.params.id); const miles=parseFloat(fresh.estimated_miles||0)||0; const drive=parseFloat(fresh.drive_minutes||0)||0; db.updateCrewSize(t.id, crew); db.updateTimesAndCost(t.id, drive, 0, hourly, crew, fuelPerMile, miles); res.redirect('/admin/tickets/'+t.id); });
 
-app.post('/admin/tickets/:id/timecost', requireAdmin, (req,res)=>{
+// NEW: delete ticket
+app.post('/admin/tickets/:id/delete', requireAdmin, (req,res)=>{
   const t = db.getTicket(req.params.id);
-  if(!t) return res.status(404).send('Ticket not found');
-  const hourly = parseFloat(process.env.EMPLOYEE_HOURLY||10);
-  const crew = parseInt(req.body.crew_size||t.crew_size||1);
-  const fuelPerMile = parseFloat(req.body.fuel_cost_per_mile||t.fuel_cost_per_mile||0.2);
-  const fresh = db.getTicket(req.params.id);
-  const miles = parseFloat(fresh.estimated_miles||0)||0;
-  const drive = parseFloat(fresh.drive_minutes||0)||0;
-  db.updateCrewSize(t.id, crew);
-  db.updateTimesAndCost(t.id, drive, 0, hourly, crew, fuelPerMile, miles);
-  res.redirect('/admin/tickets/'+t.id);
+  if(!t) return res.redirect('/admin/tickets');
+
+  // remove any scheduled event for this ticket
+  db.unscheduleTicketByTicketId(t.id);
+
+  // delete image files
+  try{
+    const imgs = (() => {
+      if (!t.images_json) return [];
+      try { return Array.isArray(t.images_json) ? t.images_json : JSON.parse(t.images_json); }
+      catch { return String(t.images_json).split(',').map(s=>s.trim()).filter(Boolean); }
+    })();
+    imgs.forEach(fn=>{
+      const p = path.join(uploadBase, fn);
+      if (p.startsWith(uploadBase) && fs.existsSync(p)) fs.unlinkSync(p);
+    });
+  } catch(e){ console.error('delete images error', e); }
+
+  // delete the ticket itself
+  db.deleteTicket(t.id);
+
+  res.redirect('/admin/tickets');
 });
 
-// Schedule & calendar endpoints (same as before)
 app.get('/admin/availability', requireAdmin, (req,res)=>{ res.render('availability', { events: db.listScheduled(), CT_ZONE }); });
 app.get('/admin/calendar', requireAdmin, (req,res)=>res.render('admin_calendar'));
-app.get('/api/schedule', requireAdmin, (req,res)=>{
-  const events = db.listScheduled().map(e=>({ id:e.id, title:`#${e.ticket_id} - ${e.donor_name}`, start:e.start_iso, end:e.end_iso }));
-  res.json(events);
-});
+app.get('/api/schedule', requireAdmin, (req,res)=>{ const events=db.listScheduled().map(e=>({ id:e.id, title:`#${e.ticket_id} - ${e.donor_name}`, start:e.start_iso, end:e.end_iso })); res.json(events); });
+
 app.get('/admin/blackouts', requireAdmin, (req,res)=>{ res.render('admin_blackouts', { days: db.listBlackouts(), CT_ZONE }); });
 app.post('/admin/blackouts', requireAdmin, (req,res)=>{ const d=String(req.body.date||'').trim(); if(d) db.addBlackout(d); res.redirect('/admin/blackouts'); });
 app.post('/admin/blackouts/:id/delete', requireAdmin, (req,res)=>{ db.deleteBlackout(req.params.id); res.redirect('/admin/blackouts'); });
-app.get('/api/blackouts', requireAdmin, (req,res)=>{
-  const { DateTime } = require('luxon');
-  const days = db.listBlackouts();
-  res.json(days.map(d=>({ start:d.date, end: DateTime.fromISO(d.date).plus({days:1}).toISODate(), display:'background', backgroundColor:'#ffd6d6' })));
-});
-app.post('/admin/tickets/:id/schedule', requireAdmin, (req,res)=>{
-  const start = DateTime.fromISO(req.body.start_iso, { zone: CT_ZONE });
-  const end = start.plus({ hours: parseFloat(req.body.duration_hours||1) });
-  const b = validateBusinessHoursCT(start, end);
-  if(!b.ok) return res.status(400).send(b.msg);
-  const conflicts = db.findConflicts(start.toISO(), end.toISO());
-  if(conflicts.length) return res.status(400).send('Conflict with existing schedule.');
-  db.scheduleTicket(req.params.id, start.toISO(), end.toISO());
-  res.redirect('/admin/tickets');
-});
-app.post('/admin/schedule/:id/move', requireAdmin, (req,res)=>{
-  const start = DateTime.fromISO(req.body.start_iso, { zone: CT_ZONE });
-  const end = DateTime.fromISO(req.body.end_iso, { zone: CT_ZONE });
-  const b = validateBusinessHoursCT(start, end);
-  if(!b.ok) return res.status(409).json({ error: b.msg });
-  const conflicts = db.findConflicts(start.toISO(), end.toISO()).filter(e=> String(e.id)!==String(req.params.id));
-  if(conflicts.length) return res.status(409).json({ error: 'Conflict' });
-  db.updateSchedule(req.params.id, start.toISO(), end.toISO());
-  res.json({ ok:true });
-});
+app.get('/api/blackouts', requireAdmin, (req,res)=>{ const days=db.listBlackouts(); res.json(days.map(d=>({ start:d.date, end: DateTime.fromISO(d.date).plus({days:1}).toISODate(), display:'background', backgroundColor:'#ffd6d6' }))); });
 
-// CSV export
-app.get('/admin/export.csv', requireAdmin, (req,res)=>{
-  const rows = db.listTickets();
-  const headers = ['id','created_at','status','donor_name','donor_email','donor_phone','pickup_address','city','state','zip','categories','condition','item_notes','preferred_date','preferred_time','bags_count','furniture_count','small_donation','crew_size','estimated_miles','drive_minutes','fuel_cost_per_mile','estimated_cost'];
-  res.setHeader('Content-Type','text/csv');
-  res.setHeader('Content-Disposition','attachment; filename="tickets.csv"');
-  res.write(headers.join(',')+'\n');
-  for(const r of rows){
-    const vals = headers.map(h=>{
-      let v = r[h];
-      if(h==='categories' && typeof v==='string'){ try{ v = JSON.parse(v).join('|'); }catch{} }
-      if(typeof v === 'string') v = `"${v.replace(/"/g,'""')}"`;
-      return v ?? '';
-    });
-    res.write(vals.join(',')+'\n');
-  }
-  res.end();
-});
+app.post('/admin/tickets/:id/schedule', requireAdmin, (req,res)=>{ const start=DateTime.fromISO(req.body.start_iso,{zone:CT_ZONE}); const end=start.plus({hours:parseFloat(req.body.duration_hours||1)}); const b=validateBusinessHoursCT(start,end); if(!b.ok) return res.status(400).send(b.msg); const conflicts=db.findConflicts(start.toISO(),end.toISO()); if(conflicts.length) return res.status(400).send('Conflict with existing schedule.'); db.scheduleTicket(req.params.id,start.toISO(),end.toISO()); res.redirect('/admin/tickets'); });
+app.post('/admin/schedule/:id/move', requireAdmin, (req,res)=>{ const start=DateTime.fromISO(req.body.start_iso,{zone:CT_ZONE}); const end=DateTime.fromISO(req.body.end_iso,{zone:CT_ZONE}); const b=validateBusinessHoursCT(start,end); if(!b.ok) return res.status(409).json({error:b.msg}); const conflicts=db.findConflicts(start.toISO(),end.toISO()).filter(e=>String(e.id)!==String(req.params.id)); if(conflicts.length) return res.status(409).json({error:'Conflict'}); db.updateSchedule(req.params.id,start.toISO(),end.toISO()); res.json({ok:true}); });
 
-// Error handler
+app.get('/admin/export.csv', requireAdmin, (req,res)=>{ const rows=db.listTickets(); const headers=['id','created_at','status','donor_name','donor_email','donor_phone','pickup_address','city','state','zip','categories','condition','item_notes','preferred_date','preferred_time','bags_count','furniture_count','small_donation','crew_size','estimated_miles','drive_minutes','fuel_cost_per_mile','estimated_cost']; res.setHeader('Content-Type','text/csv'); res.setHeader('Content-Disposition','attachment; filename="tickets.csv"'); res.write(headers.join(',')+'\n'); for(const r of rows){ const vals=headers.map(h=>{let v=r[h]; if(h==='categories'&&typeof v==='string'){try{v=JSON.parse(v).join('|')}catch{}} if(typeof v==='string') v=`"${v.replace(/"/g,'""')}"`; return v??''}); res.write(vals.join(',')+'\n'); } res.end(); });
+
+// ====== reports (unchanged if you have them) ======
+// ... keep your /admin/reports routes if present ...
+
+// errors + start
 app.use((err, req, res, next)=>{ console.error('Unhandled error:', err); res.status(500).send('Internal Server Error'); });
-
 app.listen(PORT, ()=>{ db.init(); console.log(`Server running on http://localhost:${PORT}`); });
