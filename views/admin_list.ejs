@@ -12,7 +12,6 @@
 <table class="table table-striped align-middle">
   <thead>
     <tr>
-      <th style="width:36px;"></th>
       <th>#</th>
       <th>Created (CT)</th>
       <th>Donor</th>
@@ -24,13 +23,10 @@
   </thead>
   <tbody>
   <% if (tickets.length === 0) { %>
-    <tr><td colspan="8" class="text-muted">No tickets yet.</td></tr>
+    <tr><td colspan="7" class="text-muted">No tickets yet.</td></tr>
   <% } %>
   <% tickets.forEach(t => { %>
     <tr>
-      <td>
-        <input class="form-check-input row-check" type="checkbox" id="check-<%= t.id %>">
-      </td>
       <td><%= t.id %></td>
       <td><%= new Date(t.created_at).toLocaleString('en-US',{ timeZone: CT_ZONE, hour:'numeric', minute:'2-digit', month:'short', day:'numeric' }) %></td>
       <td><%= t.donor_name %> (<%= t.donor_phone %>)</td>
@@ -48,10 +44,6 @@
       </td>
       <td class="text-end">
         <a class="btn btn-sm btn-outline-primary" href="/admin/tickets/<%= t.id %>">Open</a>
-        <form method="post" action="/admin/tickets/<%= t.id %>/delete" class="d-inline"
-              onsubmit="return (document.getElementById('check-<%= t.id %>').checked && confirm('Delete ticket #<%= t.id %>? This cannot be undone.')) || false;">
-          <button class="btn btn-sm btn-outline-danger">Delete</button>
-        </form>
       </td>
     </tr>
   <% }) %>
