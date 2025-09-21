@@ -5,20 +5,12 @@
   <a class="btn btn-sm btn-outline-secondary" href="/admin/calendar">Calendar</a>
   <a class="btn btn-sm btn-outline-warning" href="/admin/blackouts">Blackout Days</a>
   <a class="btn btn-sm btn-outline-secondary" href="/admin/export.csv">Export CSV</a>
-  <a class="btn btn-sm btn-outline-primary" href="/admin/reports">Reports</a>
-  <a class="btn btn-sm btn-outline-danger ms-auto" href="/admin/logout">Logout</a>
+  <a class="btn btn-sm btn-outline-primary ms-auto" href="/admin/reports">Reports</a>
+  <a class="btn btn-sm btn-outline-danger" href="/admin/logout">Logout</a>
 </div>
 
 <form id="bulkForm" method="post" action="/admin/tickets/bulk-delete"
       onsubmit="return confirm('Delete all selected tickets? This cannot be undone.');">
-
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="selectAll">
-      <label class="form-check-label" for="selectAll">Select all</label>
-    </div>
-    <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>Delete Selected</button>
-  </div>
 
   <table class="table table-striped align-middle">
     <thead>
@@ -65,6 +57,15 @@
     <% }) %>
     </tbody>
   </table>
+
+  <!-- Bulk controls moved BELOW the table -->
+  <div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="selectAll">
+      <label class="form-check-label" for="selectAll">Select all</label>
+    </div>
+    <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>Delete Selected</button>
+  </div>
 </form>
 
 <script>
