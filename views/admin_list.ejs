@@ -9,84 +9,51 @@
   <a class="btn btn-sm btn-outline-danger" href="/admin/logout">Logout</a>
 </div>
 
-<form id="bulkForm" method="post" action="/admin/tickets/bulk-delete"
-      onsubmit="return confirm('Delete all selected tickets? This cannot be undone.');">
-
-  <table class="table table-striped align-middle">
-    <thead>
-      <tr>
-        <th style="width:36px;"></th>
-        <th>#</th>
-        <th>Created (CT)</th>
-        <th>Donor</th>
-        <th>Address</th>
-        <th>Status</th>
-        <th>Preferred</th>
-        <th class="text-end">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-    <% tickets.forEach(t => { %>
-      <tr>
-        <td>
-          <input class="form-check-input row-check" type="checkbox" name="ids" value="<%= t.id %>">
-        </td>
-        <td><%= t.id %></td>
-        <td><%= new Date(t.created_at).toLocaleString('en-US',{ timeZone: CT_ZONE, hour:'numeric', minute:'2-digit', month:'short', day:'numeric' }) %></td>
-        <td><%= t.donor_name %> (<%= t.donor_phone %>)</td>
-        <td><%= t.pickup_address %>, <%= t.city %></td>
-        <td>
-          <span class="badge bg-<%= t.status==='new'?'secondary':(t.status==='scheduled'?'info':(t.status==='completed'?'success':'warning')) %>">
-            <%= t.status %>
-          </span>
-        </td>
-        <td>
-          <%= t.preferred_date||'' %>
-          <%= t.preferred_time
-              ? t.preferred_time.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+h;const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+mm+' '+ap;})
-              : '' %>
-        </td>
-        <td class="text-end">
-          <a class="btn btn-sm btn-outline-primary" href="/admin/tickets/<%= t.id %>">Open</a>
-          <form method="post" action="/admin/tickets/<%= t.id %>/delete" class="d-inline"
-                onsubmit="return confirm('Delete ticket #<%= t.id %>? This cannot be undone.');">
-            <button class="btn btn-sm btn-outline-danger">Delete</button>
-          </form>
-        </td>
-      </tr>
-    <% }) %>
-    </tbody>
-  </table>
-
-  <!-- Bulk controls moved BELOW the table -->
-  <div class="d-flex justify-content-between align-items-center mt-3">
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="selectAll">
-      <label class="form-check-label" for="selectAll">Select all</label>
-    </div>
-    <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>Delete Selected</button>
-  </div>
-</form>
-
-<script>
-  const selectAll = document.getElementById('selectAll');
-  const checks = () => Array.from(document.querySelectorAll('.row-check'));
-  const bulkBtn = document.getElementById('bulkDeleteBtn');
-
-  function refreshBulkBtn(){
-    const any = checks().some(c => c.checked);
-    bulkBtn.disabled = !any;
-  }
-  selectAll.addEventListener('change', () => {
-    checks().forEach(c => c.checked = selectAll.checked);
-    refreshBulkBtn();
-  });
-  document.addEventListener('change', (e) => {
-    if (e.target && e.target.classList.contains('row-check')) {
-      const all = checks();
-      selectAll.checked = all.every(c => c.checked);
-      refreshBulkBtn();
-    }
-  });
-  refreshBulkBtn();
-</script>
+<table class="table table-striped align-middle">
+  <thead>
+    <tr>
+      <th style="width:36px;"></th>
+      <th>#</th>
+      <th>Created (CT)</th>
+      <th>Donor</th>
+      <th>Address</th>
+      <th>Status</th>
+      <th>Preferred</th>
+      <th class="text-end">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  <% if (tickets.length === 0) { %>
+    <tr><td colspan="8" class="text-muted">No tickets yet.</td></tr>
+  <% } %>
+  <% tickets.forEach(t => { %>
+    <tr>
+      <td>
+        <input class="form-check-input row-check" type="checkbox" id="check-<%= t.id %>">
+      </td>
+      <td><%= t.id %></td>
+      <td><%= new Date(t.created_at).toLocaleString('en-US',{ timeZone: CT_ZONE, hour:'numeric', minute:'2-digit', month:'short', day:'numeric' }) %></td>
+      <td><%= t.donor_name %> (<%= t.donor_phone %>)</td>
+      <td><%= t.pickup_address %>, <%= t.city %></td>
+      <td>
+        <span class="badge bg-<%= t.status==='new'?'secondary':(t.status==='scheduled'?'info':(t.status==='completed'?'success':'warning')) %>">
+          <%= t.status %>
+        </span>
+      </td>
+      <td>
+        <%= t.preferred_date||'' %>
+        <%= t.preferred_time
+            ? t.preferred_time.replace(/^(\d{2}):(\d{2}).*/, (m,h,mm)=>{h=+h;const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+mm+' '+ap;})
+            : '' %>
+      </td>
+      <td class="text-end">
+        <a class="btn btn-sm btn-outline-primary" href="/admin/tickets/<%= t.id %>">Open</a>
+        <form method="post" action="/admin/tickets/<%= t.id %>/delete" class="d-inline"
+              onsubmit="return (document.getElementById('check-<%= t.id %>').checked && confirm('Delete ticket #<%= t.id %>? This cannot be undone.')) || false;">
+          <button class="btn btn-sm btn-outline-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
